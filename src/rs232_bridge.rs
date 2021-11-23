@@ -258,12 +258,12 @@ impl PjLinkRS232Projector {
                     let mut result: Result<PjLinkRS232MessageResponse, RecvError> = Ok(PjLinkRS232MessageResponse {response: vec! [], elapsed_time: 0});
 
                     for _ in 0..send_times {
-                        result = self.receive_message(message.clone(), timeout, connection_id);
+                        result = self.send_and_receive_message(message.clone(), timeout, connection_id);
                     }
 
                     result
                 } else {
-                    self.receive_message(message, timeout, connection_id)
+                    self.send_and_receive_message(message, timeout, connection_id)
                 };
 
                 match recv_message {
@@ -344,6 +344,7 @@ impl PjLinkRS232Projector {
         PjLinkResponse::OutOfParameter
     }
 
+    #[inline(always)]
     fn handle_connector_response_value(
         &self,
         request_body: &[u8; 5],
@@ -382,7 +383,7 @@ impl PjLinkRS232Projector {
     }
 
     #[inline(always)]
-    fn receive_message(
+    fn send_and_receive_message(
         &self,
         message: Vec<u8>,
         timeout: u32,
