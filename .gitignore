@@ -1,0 +1,4 @@
+/target
+/.vscode
+Cargo.lock
+projector_info.toml
