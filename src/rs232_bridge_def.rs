@@ -69,11 +69,34 @@ pub enum BridgeDefinitionCommandDefinitionOutputResponse {
     Value(String)
 } 
 
+#[derive(Deserialize, Debug)]
+#[serde(tag = "on_received_type", content = "on_received", rename_all = "snake_case")]
+pub enum BridgeDefinitionCommandDefinitionOutputProjectorResponse {
+    Value(Vec<u8>),
+    RuleMap(
+        BridgeDefinitionCommandDefinitionOutputProjectorResponseRuleMap,
+        Vec<BridgeDefinitionProjectorResponseRuleMapLsbMsbAttribute>
+    )
+} 
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum BridgeDefinitionCommandDefinitionOutputProjectorResponseRuleMap {
+    LsbMsb
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BridgeDefinitionProjectorResponseRuleMapLsbMsbAttribute {
+    pub rule_type: String,
+    pub value: Vec<u8>    
+}
+
 
 #[derive(Deserialize)]
 #[derive(Debug)]
 pub struct BridgeDefinitionCommandDefinitionOutput {
-    pub on_received: Vec<u8>,
+    #[serde(flatten)]
+    pub on_received: BridgeDefinitionCommandDefinitionOutputProjectorResponse,
     #[serde(flatten)]
     pub response: BridgeDefinitionCommandDefinitionOutputResponse,
 }

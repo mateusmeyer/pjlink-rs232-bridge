@@ -8,7 +8,7 @@ use std::{
 use log::{debug, error, info};
 use pjlink_bridge::{PjLinkCommand, PjLinkHandler, PjLinkRawPayload, PjLinkResponse};
 
-use crate::rs232_bridge_def::{BridgeDefinition, BridgeDefinitionBehavior, BridgeDefinitionCommand, BridgeDefinitionCommandDefinition, BridgeDefinitionCommandDefinitionOutput, BridgeDefinitionCommandDefinitionOutputResponse, BridgeDefinitionCommandsMap};
+use crate::rs232_bridge_def::{BridgeDefinition, BridgeDefinitionBehavior, BridgeDefinitionCommand, BridgeDefinitionCommandDefinition, BridgeDefinitionCommandDefinitionOutput, BridgeDefinitionCommandDefinitionOutputProjectorResponse, BridgeDefinitionCommandDefinitionOutputResponse, BridgeDefinitionCommandsMap};
 
 #[derive(Clone)]
 pub struct PjLinkRS232ProjectorState {
@@ -276,7 +276,7 @@ impl PjLinkRS232Projector {
                     ),
                     Err(err) => {
                         error!("Can't receive message from connector thread! ConnectionId: {}, {}", *connection_id, err);
-                        PjLinkResponse::OutOfParameter
+                        PjLinkResponse::UnavailableTime
                     }
                 }
             } else {
@@ -286,7 +286,7 @@ impl PjLinkRS232Projector {
                     std::str::from_utf8(&request_body).unwrap_or_default(),
                     std::str::from_utf8(&request_parameter).unwrap_or_default(),
                 );
-                PjLinkResponse::Undefined
+                PjLinkResponse::OutOfParameter
             }
         } else {
             debug!(
@@ -319,32 +319,18 @@ impl PjLinkRS232Projector {
             on_received: command_on_received,
             response: command_response,
         } in &command_input_definition.outputs {
-            // Output from projector is equal to output from projector spec
-            if projector_response.eq(command_on_received) {
-                match command_response {
-                    BridgeDefinitionCommandDefinitionOutputResponse::Value(command_response_value) => {
-                        let handler_response_value: PjLinkResponse = command_response_value.clone().into();
-                        debug!(
-                            "Translated response: ConnectionId: {}, CmdBodyWithClass: {}, TxParam: {}",
-                            *connection_id,
-                            std::str::from_utf8(&request_body).unwrap_or_default(),
-                            command_response_value
-                        );
-
-                        return handler_response_value;
-                    },
-                    BridgeDefinitionCommandDefinitionOutputResponse::Default(command_response) => {
-                        let handler_response_value: PjLinkResponse = command_response.clone().into();
-                        debug!(
-                            "Translated response: ConnectionId: {}, CmdBodyWithClass: {}, TxParam: {}",
-                            *connection_id,
-                            std::str::from_utf8(&request_body).unwrap_or_default(),
-                            command_response
-                        );
-
+            match command_on_received {
+                BridgeDefinitionCommandDefinitionOutputProjectorResponse::Value(command_on_received_value) =>
+                    if let Some(handler_response_value) = self.handle_connector_response_value(
+                        &request_body,
+                        &projector_response,
+                        command_on_received_value,
+                        command_response,
+                        connection_id
+                    ) {
                         return handler_response_value;
                     }
-                }
+                BridgeDefinitionCommandDefinitionOutputProjectorResponse::RuleMap(_, _) => panic!("RuleMap not implemented")
             }
         }
 
@@ -356,6 +342,43 @@ impl PjLinkRS232Projector {
             std::str::from_utf8(&projector_response).unwrap_or_default(),
         );
         PjLinkResponse::OutOfParameter
+    }
+
+    fn handle_connector_response_value(
+        &self,
+        request_body: &[u8; 5],
+        projector_response: &[u8],
+        command_on_received: &[u8],
+        command_response: &BridgeDefinitionCommandDefinitionOutputResponse,
+        connection_id: &u64
+    ) -> Option<PjLinkResponse> {
+        // Output from projector is equal to output from projector spec
+        if projector_response.eq(command_on_received) {
+            match command_response {
+                BridgeDefinitionCommandDefinitionOutputResponse::Value(command_response_value) => {
+                    let handler_response_value: PjLinkResponse = command_response_value.clone().into();
+                    debug!(
+                        "Translated response: ConnectionId: {}, CmdBodyWithClass: {}, TxParam: {}",
+                        *connection_id,
+                        std::str::from_utf8(request_body).unwrap_or_default(),
+                        command_response_value
+                    );
+
+                    Some(handler_response_value)
+                },
+                BridgeDefinitionCommandDefinitionOutputResponse::Default(command_response) => {
+                    let handler_response_value: PjLinkResponse = command_response.clone().into();
+                    debug!(
+                        "Translated response: ConnectionId: {}, CmdBodyWithClass: {}, TxParam: {}",
+                        *connection_id,
+                        std::str::from_utf8(request_body).unwrap_or_default(),
+                        command_response
+                    );
+
+                    Some(handler_response_value)
+                }
+            }
+        } else {None}
     }
 
     #[inline(always)]
